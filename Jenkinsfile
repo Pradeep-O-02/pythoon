@@ -15,48 +15,23 @@ pipeline {
     }
 
     stage('AI Code Review') {
-  when {
-    expression { return env.CHANGE_ID != null }
-  }
-  steps {
-    script {
-      def base = sh(script: 'git merge-base origin/master HEAD', returnStdout: true).trim()
-      def commitMessage = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
-      def diffFiles = sh(script: "git diff --name-only ${base} HEAD -- '*.py'", returnStdout: true).trim().split('\n')
+      when {
+        expression { return env.CHANGE_ID != null }  // ? Only run for PRs
+      }
+      steps {
+        script {
+          def base = sh(script: 'git merge-base origin/master HEAD', returnStdout: true).trim()
+          def commitMessage = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
+          def diffFiles = sh(script: "git diff --name-only ${base} HEAD", returnStdout: true).trim().split('\n')
 
-      def beforeAfterPairs = diffFiles.collect { file ->
-        def diffLines = sh(script: "git diff ${base} HEAD -- ${file}", returnStdout: true).trim()
-        
-        // Extract function names from the diff
-        def changedFunctions = diffLines.readLines()
-          .findAll { it.startsWith('+def ') || it.startsWith('-def ') }
-          .collect { it.replaceAll(/^[+-]/, '').replaceAll(/\s.*/, '') } // get only `def funcname`
+          def beforeAfterPairs = diffFiles.collect { file ->
+            def before = sh(script: "git show ${base}:${file}", returnStdout: true).trim()
+            def after = sh(script: "git show HEAD:${file}", returnStdout: true).trim()
+            return "**File: ${file}**\n\n--- BEFORE ---\n${before}\n\n--- AFTER ---\n${after}\n"
+          }.join("\n\n")
 
-        // De-duplicate function names
-        changedFunctions = changedFunctions.unique()
-
-        // For each function, extract full function block from both versions
-        def functionDiffs = changedFunctions.collect { func ->
-          def safeFunc = func.replaceAll(/[^\w]/, '') // sanitize for grep
-          def before = sh(script: """git show ${base}:${file} | awk '/^def ${safeFunc}\\(/,/^\\$/'""", returnStdout: true).trim()
-          def after  = sh(script: """git show HEAD:${file} | awk '/^def ${safeFunc}\\(/,/^\\$/'""", returnStdout: true).trim()
-
-
-          return """**${file}  Function: ${func}**
-
---- BEFORE ---
-${before}
-
---- AFTER ---
-${after}
-"""
-        }
- 
-        return functionDiffs.join("\n\n")
-      }.join("\n\n")
-
-      def prompt = """Please review the following Python function changes for correctness, logic issues, and best practices.
-Only the modified functions are included.
+          def prompt = """Compare the following code changes for logic errors, bugs, and best practices.
+Each file shows the full content before and after the change.
 
 ${beforeAfterPairs}
 
@@ -101,5 +76,4 @@ String parseResponse(String jsonText) {
   def parsed = slurper.parseText(jsonText)
   return parsed?.response ?: parsed?.message?.content ?: 'No response from AI'
 }
-
 

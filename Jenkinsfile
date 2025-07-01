@@ -75,3 +75,4 @@ String parseResponse(String jsonText) {
   def parsed = slurper.parseText(jsonText)
   return parsed?.response ?: parsed?.message?.content ?: 'No response from AI'
 }
+

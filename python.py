@@ -1,9 +1,9 @@
 def add(x, y):
-    return x - y
-
-def subtract(x, y):
     return x + y
-
+     print("addition successsful ")
+def subtract(x, y):
+    return x - y
+     print("substraction successsful ")
 def multiply(x, y):
     print("multiplication successsful ")
     return x * y

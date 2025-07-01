@@ -37,7 +37,7 @@ ${commitMessage}
 """
 
           def jsonText = """{
-            "model": "codellama:7b",
+            "model": "codellama:13b",
             "prompt": ${groovy.json.JsonOutput.toJson(prompt)},
             "stream": false
           }"""

@@ -9,21 +9,23 @@ pipeline {
     stage('fetch code') {
       steps {
         checkout scm
+        sh 'git fetch origin main' // Ensure origin/main is available for comparison
       }
     }
 
     stage('AI Code Review') {
       when {
-        expression { return env.CHANGE_ID != null }  // Only run if it's a PR
+        expression { return env.CHANGE_ID != null }  // Run only for PRs
       }
       steps {
         script {
+          def base = sh(script: 'git merge-base origin/main HEAD', returnStdout: true).trim()
           def commitMessage = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
-          def diffFiles = sh(script: 'git diff --name-only origin/main', returnStdout: true).trim().split('\n')
+          def diffFiles = sh(script: "git diff --name-only ${base} HEAD", returnStdout: true).trim().split('\n')
 
           def beforeAfterPairs = diffFiles.collect { file ->
-              def before = sh(script: "git show origin/main:${file}", returnStdout: true).trim()
-              def after = sh(script: "cat ${file}", returnStdout: true).trim()
+              def before = sh(script: "git show ${base}:${file}", returnStdout: true).trim()
+              def after = sh(script: "git show HEAD:${file}", returnStdout: true).trim()
               return "**File: ${file}**\n\n--- BEFORE ---\n${before}\n\n--- AFTER ---\n${after}\n"
           }.join("\n\n")
 

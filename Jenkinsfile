@@ -9,13 +9,14 @@ pipeline {
     stage('fetch code') {
       steps {
         checkout scm
-        sh 'git fetch origin master' // Ensure origin/master is available for comparison
+        // ? Ensure `origin/master` exists for git comparisons
+        sh 'git fetch origin master:refs/remotes/origin/master'
       }
     }
 
     stage('AI Code Review') {
       when {
-        expression { return env.CHANGE_ID != null }  // Run only for PRs
+        expression { return env.CHANGE_ID != null }  // ? Only run for PRs
       }
       steps {
         script {
@@ -55,7 +56,7 @@ ${commitMessage}
           def responseText = readFile('ai_response.json')
           def message = parseResponse(responseText)
 
-          echo "🧠 AI Code Review:\n${message}"
+          echo "?? AI Code Review:\n${message}"
 
           emailext (
             subject: "AI Code Review for PR #${env.CHANGE_ID}",
@@ -75,4 +76,5 @@ String parseResponse(String jsonText) {
   def parsed = slurper.parseText(jsonText)
   return parsed?.response ?: parsed?.message?.content ?: 'No response from AI'
 }
+
 

@@ -38,8 +38,9 @@ pipeline {
         // For each function, extract full function block from both versions
         def functionDiffs = changedFunctions.collect { func ->
           def safeFunc = func.replaceAll(/[^\w]/, '') // sanitize for grep
-          def before = sh(script: "git show ${base}:${file} | awk '/^def ${safeFunc}\\(/,/^$/'", returnStdout: true).trim()
-          def after = sh(script: "git show HEAD:${file} | awk '/^def ${safeFunc}\\(/,/^$/'", returnStdout: true).trim()
+          def before = sh(script: """git show ${base}:${file} | awk '/^def ${safeFunc}\\(/,/^\\$/'""", returnStdout: true).trim()
+          def after  = sh(script: """git show HEAD:${file} | awk '/^def ${safeFunc}\\(/,/^\\$/'""", returnStdout: true).trim()
+
 
           return """**${file}  Function: ${func}**
 
@@ -50,7 +51,7 @@ ${before}
 ${after}
 """
         }
-
+ 
         return functionDiffs.join("\n\n")
       }.join("\n\n")
 

@@ -24,16 +24,12 @@ pipeline {
           def commitMessage = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
           def diffFiles = sh(script: "git diff --name-only ${base} HEAD", returnStdout: true).trim().split('\n')
 
-          def beforeAfterPairs = diffFiles.collect { file ->
-            def before = sh(script: "git show ${base}:${file}", returnStdout: true).trim()
-            def after = sh(script: "git show HEAD:${file}", returnStdout: true).trim()
-            return "**File: ${file}**\n\n--- BEFORE ---\n${before}\n\n--- AFTER ---\n${after}\n"
-          }.join("\n\n")
+          def diffOutput = sh(script: "git diff ${base} HEAD", returnStdout: true).trim()
 
-          def prompt = """Compare the following code changes for logic errors, bugs, and best practices.
-Each file shows the full content before and after the change.
+def prompt = """Review the following code changes for logic issues or bad practices.
+Only comment on actual changes.
 
-${beforeAfterPairs}
+${diffOutput}
 
 Commit message:
 ${commitMessage}

@@ -60,7 +60,7 @@ ${commitMessage}
             def responseText = readFile('ai_response.json')
             def message = parseResponse(responseText)
 
-            writeFile file: 'gh_comment.md', text: "### ?? AI Code Review\n\n${message}"
+            writeFile file: 'gh_comment.md', text: "### ?? AI code Code Review\n\n${message}"
 
 
             sh """

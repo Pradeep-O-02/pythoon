@@ -3,20 +3,22 @@ pipeline {
 
   environment {
     OLLAMA_URL = 'http://localhost:11434'
+    GITHUB_REPO = 'Pradeep-O-02/pythoon'
+	GITHUB_TOKEN = credentials('githubpass')
   }
 
   stages {
     stage('fetch code') {
       steps {
         checkout scm
-        // ? Ensure `origin/master` exists for git comparisons
+        // Ensure `origin/master` exists for git comparisons
         sh 'git fetch origin master:refs/remotes/origin/master'
       }
     }
 
     stage('AI Code Review') {
       when {
-        expression { return env.CHANGE_ID != null }  // ? Only run for PRs
+        expression { return env.CHANGE_ID != null } // Only run for PRs
       }
       steps {
         script {
@@ -56,14 +58,14 @@ ${commitMessage}
           def responseText = readFile('ai_response.json')
           def message = parseResponse(responseText)
 
-          echo "?? AI Code Review:\n${message}"
+          writeFile file: 'gh_comment.md', text: "### ?? AI Code Review\n\n${message}"
 
-          emailext (
-            subject: "AI Code Review for PR #${env.CHANGE_ID}",
-            body: """<h2>AI Review for Pull Request</h2><pre>${message}</pre>""",
-            mimeType: 'text/html',
-            to: 'pradeep.o@lirisoft.com'
-          )
+          withEnv(["GITHUB_TOKEN=${env.GITHUB_TOKEN}"]) {
+            sh """
+              gh auth login --with-token <<< "${GITHUB_TOKEN}"
+              gh pr comment ${env.CHANGE_ID} --body-file gh_comment.md --repo ${GITHUB_REPO}
+            """
+          }
         }
       }
     }
@@ -76,4 +78,5 @@ String parseResponse(String jsonText) {
   def parsed = slurper.parseText(jsonText)
   return parsed?.response ?: parsed?.message?.content ?: 'No response from AI'
 }
+
 

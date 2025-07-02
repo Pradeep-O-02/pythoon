@@ -61,8 +61,8 @@ ${commitMessage}
             def message = parseResponse(responseText)
 
             writeFile file: 'gh_comment.md', text: "### ?? AI Code Review\n\n${message}"
-###
-###
+
+
             sh """
               gh pr comment ${env.CHANGE_ID} \
               --body-file gh_comment.md \

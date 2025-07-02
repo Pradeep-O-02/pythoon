@@ -61,10 +61,11 @@ ${commitMessage}
           writeFile file: 'gh_comment.md', text: "### ?? AI Code Review\n\n${message}"
 
           withEnv(["GITHUB_TOKEN=${env.GITHUB_TOKEN}"]) {
-            sh """
-              gh auth login --with-token <<< "${GITHUB_TOKEN}"
-              gh pr comment ${env.CHANGE_ID} --body-file gh_comment.md --repo ${GITHUB_REPO}
-            """
+            sh '''
+             echo "$GITHUB_TOKEN" | gh auth login --with-token
+             gh pr comment "$CHANGE_ID" --body-file gh_comment.md --repo Pradeep-O-02/pythoon
+           '''
+
           }
         }
       }

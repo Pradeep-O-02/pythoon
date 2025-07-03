@@ -6,6 +6,7 @@ def subtract(x, y):
      print("substraction successsful ")
 def multiply(x, y):
     print("multiplication successsful ")
+    print("multiplication2 successsful ")
     return x * y
 
 def divide(x, y):

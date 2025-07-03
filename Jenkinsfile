@@ -38,7 +38,7 @@ pipeline {
               return "**File: ${file}**\n\n${funcDiff}"
             }.join("\n\n")
 
-            def prompt = """Review the following Python function changes for logic errors, bugs, or bad practices.
+            def prompt = """Review the following recent PR for Python function changes for logic errors, bugs, or bad practices.
 Only comment on the parts that were modified.
 
 ${changedFuncs}

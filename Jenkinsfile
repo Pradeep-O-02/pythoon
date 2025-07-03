@@ -6,10 +6,11 @@ pipeline {
   }
 
   stages {
-    stage('fetch code') {
+    stage('Fetch Code') {
       steps {
         checkout scm
-        sh 'git fetch origin master:refs/remotes/origin/master'
+        // Force-fetch latest master to ensure merge-base works correctly
+        sh 'git fetch origin +refs/heads/master:refs/remotes/origin/master'
       }
     }
 
@@ -24,7 +25,11 @@ pipeline {
             def commitMessage = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
             def diffFiles = sh(script: "git diff --name-only ${base} HEAD", returnStdout: true).trim().split('\n')
 
-            // Extract only changed function definitions using git diff chunks
+            // Debugging output
+            echo "Merge base: ${base}"
+            echo "Changed files: ${diffFiles.join(', ')}"
+
+            // Extract changed function-level diffs from modified files
             def changedFuncs = diffFiles.collect { file ->
               def funcDiff = sh(
                 script: "git diff ${base} HEAD -- ${file} | awk '/^@@/,/^@@/'",
@@ -61,11 +66,14 @@ ${commitMessage}
 
             writeFile file: 'gh_comment.md', text: "### ?? AI Code Review\n\n${message}"
 
-            // Login to GitHub CLI using token, then post PR comment
+            // Authenticate once using GITHUB_TOKEN
+            sh 'echo "$GITHUB_TOKEN" | gh auth login --with-token'
+
+            // Post comment to the PR
             sh """
-             gh pr comment ${env.CHANGE_ID} \
-             --body-file gh_comment.md \
-             --repo Pradeep-O-02/pythoon
+              gh pr comment ${env.CHANGE_ID} \
+              --body-file gh_comment.md \
+              --repo Pradeep-O-02/pythoon
             """
           }
         }
@@ -80,6 +88,7 @@ String parseResponse(String jsonText) {
   def parsed = slurper.parseText(jsonText)
   return parsed?.response ?: parsed?.message?.content ?: 'No response from AI'
 }
+
 
 
 

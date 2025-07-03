@@ -41,7 +41,14 @@ pipeline {
               return "**File: ${file}**\n```diff\n${fileDiff}\n```"
             }.join("\n\n")
 
-            def prompt = """You are a code reviewer. Review the following Pull Request diff for:
+            def prompt = """Review the following recent PR for changes for logic errors, linting, syntatical issues, or bad practices. Also, the verify the commit message, commit message shoule have the ticket-id and description mentioned
+format of commit message should be:
+[TICKET_ID]: Ticket-Title
+{CHANGE_DESCRIPTION} 
+------------------------------------- 
+
+Important Note: If the PR looks good and no change is needed give the message as: "Verfied Pull Request: No Change Needed"
+
 
 - Logic errors
 - Linting or syntax issues

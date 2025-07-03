@@ -19,7 +19,6 @@ pipeline {
       }
       steps {
         withCredentials([string(credentialsId: 'github_token_id', variable: 'GITHUB_TOKEN')]) {
-		// use $GITHUB_TOKEN
           script {
             def base = sh(script: 'git merge-base origin/master HEAD', returnStdout: true).trim()
             def commitMessage = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
@@ -31,7 +30,6 @@ pipeline {
                 script: "git diff ${base} HEAD -- ${file} | awk '/^@@/,/^@@/'",
                 returnStdout: true
               ).trim()
-
               return "**File: ${file}**\n\n${funcDiff}"
             }.join("\n\n")
 
@@ -61,14 +59,14 @@ ${commitMessage}
             def responseText = readFile('ai_response.json')
             def message = parseResponse(responseText)
 
-            writeFile file: 'gh_comment.md', text: "### ?? AI code Code Review\n\n${message}"
+            writeFile file: 'gh_comment.md', text: "### ?? AI Code Review\n\n${message}"
 
-
+            // Login to GitHub CLI using token, then post PR comment
+            sh 'echo "$GITHUB_TOKEN" | gh auth login --with-token'
             sh """
               gh pr comment ${env.CHANGE_ID} \
               --body-file gh_comment.md \
-              --repo Pradeep-O-02/pythoon \
-              --auth "\$GITHUB_TOKEN"
+              --repo Pradeep-O-02/pythoon
             """
           }
         }
@@ -83,6 +81,7 @@ String parseResponse(String jsonText) {
   def parsed = slurper.parseText(jsonText)
   return parsed?.response ?: parsed?.message?.content ?: 'No response from AI'
 }
+
 
 
 

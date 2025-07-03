@@ -86,12 +86,11 @@ ${changedContent}
             writeFile file: 'gh_comment.md', text: "### ?? AI Code Review\n\n${message}"
 
             // Post comment to GitHub PR dynamically
-            sh """
-              echo "$GITHUB_TOKEN" | gh auth login --with-token
-              gh pr comment ${CHANGE_ID} \
-                --body-file gh_comment.md \
-                --repo "$(git config --get remote.origin.url | sed -E 's|.*github.com[:/](.+)\\.git|\\1|')"
-            """
+            sh '''
+             gh pr comment $CHANGE_ID \
+             --body-file gh_comment.md \
+             --repo Pradeep-O-02/pythoon
+            '''
           }
         }
       }

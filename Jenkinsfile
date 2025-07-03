@@ -19,6 +19,7 @@ pipeline {
       }
       steps {
         withCredentials([string(credentialsId: 'github_token_id', variable: 'GITHUB_TOKEN')]) {
+		// use $GITHUB_TOKEN
           script {
             def base = sh(script: 'git merge-base origin/master HEAD', returnStdout: true).trim()
             def commitMessage = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()

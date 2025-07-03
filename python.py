@@ -12,6 +12,7 @@ def divide(x, y):
     if y == 0:
         return "Error: Cannot divide by zero"
     return x / y
+print("divide  successsful ")
 
 def calculator():
     print("Simple Calculator")

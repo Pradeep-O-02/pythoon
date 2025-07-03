@@ -62,11 +62,10 @@ ${commitMessage}
             writeFile file: 'gh_comment.md', text: "### ?? AI Code Review\n\n${message}"
 
             // Login to GitHub CLI using token, then post PR comment
-            sh 'echo "$GITHUB_TOKEN" | gh auth login --with-token'
             sh """
-              gh pr comment ${env.CHANGE_ID} \
-              --body-file gh_comment.md \
-              --repo Pradeep-O-02/pythoon
+             gh pr comment ${env.CHANGE_ID} \
+             --body-file gh_comment.md \
+             --repo Pradeep-O-02/pythoon
             """
           }
         }

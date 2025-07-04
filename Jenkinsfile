@@ -9,8 +9,6 @@ pipeline {
     stage('Fetch Code') {
       steps {
         checkout scm
-
-        // Dynamically fetch the destination branch (CHANGE_TARGET)
         sh 'echo "Fetching destination branch for merge-base..."'
         sh "git fetch origin +refs/heads/${CHANGE_TARGET}:refs/remotes/origin/${CHANGE_TARGET}"
       }
@@ -23,7 +21,6 @@ pipeline {
       steps {
         withCredentials([string(credentialsId: 'github_token_id', variable: 'GITHUB_TOKEN')]) {
           script {
-            // Use merge-base between destination and current PR source
             def base = sh(script: "git merge-base origin/${CHANGE_TARGET} HEAD", returnStdout: true).trim()
             def commitMessage = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
             def diffFiles = sh(script: "git diff --name-only ${base} HEAD", returnStdout: true).trim().split('\n')
@@ -38,38 +35,34 @@ pipeline {
                 script: "git diff ${base} HEAD -- ${file}",
                 returnStdout: true
               ).trim()
-              return "**File: ${file}**\n```diff\n${fileDiff}\n```"
+              def ext = file.tokenize('.').last().toLowerCase()
+              def language = detectLanguage(ext)
+
+              return "**File: ${file}** _(Language: ${language})_\n```diff\n${fileDiff}\n```"
             }.join("\n\n")
 
-            def prompt = """Review the following recent PR for changes for logic errors, linting, syntatical issues, or bad practices. Also, the verify the commit message, commit message shoule have the ticket-id and description mentioned
-format of commit message should be:
-[TICKET_ID]: Ticket-Title
-{CHANGE_DESCRIPTION} 
-------------------------------------- 
+            def prompt = """You are an expert code reviewer.
 
-Important Note: If the PR looks good and no change is needed give the message as: "Verfied Pull Request: No Change Needed"
-
+Your task is to review the following pull request diff for:
 
 - Logic errors
 - Linting or syntax issues
 - Bad practices
 - Commit message formatting
 
-The expected commit message format is:
+? Commit Message Format:
 [TICKET_ID]: Ticket-Title
 {CHANGE_DESCRIPTION}
 
-If everything looks good, respond exactly with:
+If everything looks good, respond with **exactly**:
 "Verified Pull Request: No Change Needed"
 
-------------------------
+Pull Request: `${CHANGE_BRANCH}` ? `${CHANGE_TARGET}`
 
-Pull Request from `${CHANGE_BRANCH}` to `${CHANGE_TARGET}`
-
-Commit Message:
+?? Commit Message:
 ${commitMessage}
 
-Changed Code:
+?? Changed Code:
 ${changedContent}
 """
 
@@ -92,11 +85,10 @@ ${changedContent}
 
             writeFile file: 'gh_comment.md', text: "### ?? AI Code Review\n\n${message}"
 
-            // Post comment to GitHub PR dynamically
             sh '''
-             gh pr comment $CHANGE_ID \
-             --body-file gh_comment.md \
-             --repo Pradeep-O-02/pythoon
+              gh pr comment $CHANGE_ID \
+              --body-file gh_comment.md \
+              --repo Pradeep-O-02/pythoon
             '''
           }
         }
@@ -112,6 +104,33 @@ String parseResponse(String jsonText) {
   def parsed = slurper.parseText(jsonText)
   return parsed?.response ?: parsed?.message?.content ?: 'No response from AI model.'
 }
+
+// Map file extensions to programming languages
+@NonCPS
+String detectLanguage(String ext) {
+  switch(ext) {
+    case 'py': return 'Python'
+    case 'js': return 'JavaScript'
+    case 'ts': return 'TypeScript'
+    case 'java': return 'Java'
+    case 'rb': return 'Ruby'
+    case 'go': return 'Go'
+    case 'cpp': case 'cc': case 'cxx': return 'C++'
+    case 'c': return 'C'
+    case 'cs': return 'C#'
+    case 'kt': return 'Kotlin'
+    case 'sh': return 'Shell'
+    case 'yaml': case 'yml': return 'YAML'
+    case 'json': return 'JSON'
+    case 'html': return 'HTML'
+    case 'css': return 'CSS'
+    case 'php': return 'PHP'
+    case 'scala': return 'Scala'
+    case 'rs': return 'Rust'
+    default: return 'Unknown'
+  }
+}
+
 
 
 

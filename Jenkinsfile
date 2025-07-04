@@ -50,7 +50,7 @@ Your task is to review the following pull request diff for:
 - Bad practices
 - Commit message formatting
 
-? Commit Message Format:
+Commit Message Format:
 [TICKET_ID]: Ticket-Title
 {CHANGE_DESCRIPTION}
 
@@ -59,10 +59,10 @@ If everything looks good, respond with **exactly**:
 
 Pull Request: `${CHANGE_BRANCH}` ? `${CHANGE_TARGET}`
 
-?? Commit Message:
+Commit Message:
 ${commitMessage}
 
-?? Changed Code:
+ Changed Code:
 ${changedContent}
 """
 
@@ -71,7 +71,8 @@ ${changedContent}
               prompt: prompt,
               stream: false
             ])
-
+            // Print the final prompt to Jenkins log
+             echo "Final Prompt Sent to Ollama:\n${prompt}"
             writeFile file: 'ollama_request.json', text: jsonText
 
             sh """
@@ -83,12 +84,12 @@ ${changedContent}
             def responseText = readFile('ai_response.json')
             def message = parseResponse(responseText)
 
-            writeFile file: 'gh_comment.md', text: "### ?? AI Code Review\n\n${message}"
+            writeFile file: 'gh_comment.md', text: "### AI Code Review\n\n${message}"
 
             sh '''
               gh pr comment $CHANGE_ID \
               --body-file gh_comment.md \
-              --repo Pradeep-O-02/pythoon
+              --repo Pradeep-O-02/python
             '''
           }
         }

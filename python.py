@@ -2,9 +2,9 @@ def add(x, y):
     return x + y
      print("addition successsful ")
 
-     def add(x, y):
-    return x + y
-     print("addition successsful ")
+     def mul(x, y):
+    return x * y
+     print("multification successsful ")
 
 def subtract(x, y):
     return x - y

@@ -6,72 +6,138 @@ pipeline {
   }
 
   stages {
-    stage('fetch code') {
+    stage('Fetch Code') {
       steps {
         checkout scm
-        sh 'git fetch origin master' // Ensure origin/master is available for comparison
+
+        // Dynamically fetch the destination branch (CHANGE_TARGET)
+        sh 'echo "Fetching destination branch for merge-base..."'
+        sh "git fetch origin +refs/heads/${CHANGE_TARGET}:refs/remotes/origin/${CHANGE_TARGET}"
       }
     }
 
     stage('AI Code Review') {
       when {
-        expression { return env.CHANGE_ID != null }  // Run only for PRs
+        expression { return env.CHANGE_ID != null }
       }
       steps {
-        script {
-          def base = sh(script: 'git merge-base origin/master HEAD', returnStdout: true).trim()
-          def commitMessage = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
-          def diffFiles = sh(script: "git diff --name-only ${base} HEAD", returnStdout: true).trim().split('\n')
+        withCredentials([string(credentialsId: 'github_token_id', variable: 'GITHUB_TOKEN')]) {
+          script {
+            def base = sh(script: "git merge-base origin/${CHANGE_TARGET} HEAD", returnStdout: true).trim()
+            def commitMessage = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
+            def diffFiles = sh(script: "git diff --name-only ${base} HEAD", returnStdout: true).trim().split('\n')
 
-          def beforeAfterPairs = diffFiles.collect { file ->
-            def before = sh(script: "git show ${base}:${file}", returnStdout: true).trim()
-            def after = sh(script: "git show HEAD:${file}", returnStdout: true).trim()
-            return "**File: ${file}**\n\n--- BEFORE ---\n${before}\n\n--- AFTER ---\n${after}\n"
-          }.join("\n\n")
+            echo "Source branch: ${CHANGE_BRANCH}"
+            echo "Destination branch: ${CHANGE_TARGET}"
+            echo "Merge base: ${base}"
+            echo "Changed files: ${diffFiles.join(', ')}"
 
-          def prompt = """Compare the following code changes for logic errors, bugs, and best practices.
-Each file shows the full content before and after the change.
+            def changedContent = diffFiles.collect { file ->
+              def ext = file.tokenize('.').last().toLowerCase()
+              def language = detectLanguage(ext)
 
-${beforeAfterPairs}
+              def fileDiff = sh(
+                script: "git diff --unified=3 --function-context ${base} HEAD -- ${file}",
+                returnStdout: true
+              ).trim()
 
-Commit message:
+              return "**File: ${file}** _(Language: ${language})_\n```diff\n${fileDiff}\n```"
+            }.join("\n\n")
+
+            def prompt = """You are an expert code reviewer.
+
+Your task is to review the following pull request diff for:
+
+- Logic errors
+- Linting or syntax issues
+- Bad practices
+- Commit message formatting
+
+Commit Message Format:
+[TICKET_ID]: Ticket-Title
+{CHANGE_DESCRIPTION}
+
+If everything looks good, respond with **exactly**:
+\"Verified Pull Request: No Change Needed\"
+
+Pull Request: `${CHANGE_BRANCH}` ? `${CHANGE_TARGET}`
+
+Commit Message:
 ${commitMessage}
+
+Changed Code:
+${changedContent}
 """
 
-          def jsonText = """{
-            "model": "codellama:13b",
-            "prompt": ${groovy.json.JsonOutput.toJson(prompt)},
-            "stream": false
-          }"""
+            def jsonText = groovy.json.JsonOutput.toJson([
+              model : "codellama:13b",
+              prompt: prompt,
+              stream: false
+            ])
 
-          writeFile file: 'ollama_request.json', text: jsonText
+            echo "Final Prompt Sent to Ollama:\n${prompt}"
 
-          sh """
-            curl -s \$OLLAMA_URL/api/generate \
-            -H "Content-Type: application/json" \
-            -d @ollama_request.json > ai_response.json
-          """
+            writeFile file: 'ollama_request.json', text: jsonText
 
-          def responseText = readFile('ai_response.json')
-          def message = parseResponse(responseText)
+            sh """
+              curl -s \"${OLLAMA_URL}/api/generate\" \
+              -H "Content-Type: application/json" \
+              -d @ollama_request.json > ai_response.json
+            """
 
-          echo "🧠 AI Code Review:\n${message}"
+            def responseText = readFile('ai_response.json')
+            def message = parseResponse(responseText)
 
-          emailext (
-            subject: "AI Code Review for PR #${env.CHANGE_ID}",
-            body: """<h2>AI Review for Pull Request</h2><pre>${message}</pre>""",
-            mimeType: 'text/html',
-            to: 'pradeep.o@lirisoft.com'
-          )
+            writeFile file: 'gh_comment.md', text: "### ?? AI Code Review\n\n${message}"
+
+            sh '''
+             gh pr comment $CHANGE_ID \
+             --body-file gh_comment.md \
+             --repo Pradeep-O-02/pythoon
+            '''
+          }
         }
       }
     }
   }
 }
 
+// Parse Ollama response JSON
 @NonCPS
 String parseResponse(String jsonText) {
   def slurper = new groovy.json.JsonSlurper()
   def parsed = slurper.parseText(jsonText)
-  return parsed?.response ?: parsed?.message?.content ?: 'No response from AI'
+  return parsed?.response ?: parsed?.message?.content ?: 'No response from AI model.'
 }
+
+// Map file extensions to programming languages
+@NonCPS
+String detectLanguage(String ext) {
+  switch(ext) {
+    case 'py': return 'Python'
+    case 'js': return 'JavaScript'
+    case 'ts': return 'TypeScript'
+    case 'java': return 'Java'
+    case 'rb': return 'Ruby'
+    case 'go': return 'Go'
+    case 'cpp': case 'cc': case 'cxx': return 'C++'
+    case 'c': return 'C'
+    case 'cs': return 'C#'
+    case 'kt': return 'Kotlin'
+    case 'sh': return 'Shell'
+    case 'yaml': case 'yml': return 'YAML'
+    case 'json': return 'JSON'
+    case 'html': return 'HTML'
+    case 'css': return 'CSS'
+    case 'php': return 'PHP'
+    case 'scala': return 'Scala'
+    case 'rs': return 'Rust'
+    default: return 'Unknown'
+  }
+}
+
+
+
+
+
+

@@ -1,17 +1,19 @@
-def add(x, y):
-    return x + y
+def add(a, b):
+    return a + b
+     print("addition successsful ")
 
 def subtract(x, y):
     return x - y
-
+     print("substraction successsful ")
 def multiply(x, y):
-    print("multiply ")
+    print("multiplication successsful ")
     return x * y
 
 def divide(x, y):
     if y == 0:
         return "Error: Cannot divide by zero"
     return x / y
+print("divide  successsful for the above operator ")
 
 def calculator():
     print("Simple Calculator")

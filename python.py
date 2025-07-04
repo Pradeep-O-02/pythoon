@@ -1,6 +1,11 @@
 def add(x, y):
     return x + y
      print("addition successsful ")
+
+     def add(x, y):
+    return x + y
+     print("addition successsful ")
+
 def subtract(x, y):
     return x - y
      print("substraction successsful ")

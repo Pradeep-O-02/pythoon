@@ -1,17 +1,12 @@
-def add(x, y):
-    return x + y
+def add(a, b):
+    return a + b
      print("addition successsful ")
-
-     def mul(x, y):
-    return x * y
-     print("multification successsful ")
 
 def subtract(x, y):
     return x - y
      print("substraction successsful ")
 def multiply(x, y):
     print("multiplication successsful ")
-    print("multiplication2 successsful ")
     return x * y
 
 def divide(x, y):

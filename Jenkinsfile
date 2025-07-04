@@ -9,6 +9,8 @@ pipeline {
     stage('Fetch Code') {
       steps {
         checkout scm
+
+        // Dynamically fetch the destination branch (CHANGE_TARGET)
         sh 'echo "Fetching destination branch for merge-base..."'
         sh "git fetch origin +refs/heads/${CHANGE_TARGET}:refs/remotes/origin/${CHANGE_TARGET}"
       }
@@ -31,12 +33,13 @@ pipeline {
             echo "Changed files: ${diffFiles.join(', ')}"
 
             def changedContent = diffFiles.collect { file ->
-              def fileDiff = sh(
-                script: "git diff ${base} HEAD -- ${file}",
-                returnStdout: true
-              ).trim()
               def ext = file.tokenize('.').last().toLowerCase()
               def language = detectLanguage(ext)
+
+              def fileDiff = sh(
+                script: "git diff --unified=3 --function-context ${base} HEAD -- ${file}",
+                returnStdout: true
+              ).trim()
 
               return "**File: ${file}** _(Language: ${language})_\n```diff\n${fileDiff}\n```"
             }.join("\n\n")
@@ -55,14 +58,14 @@ Commit Message Format:
 {CHANGE_DESCRIPTION}
 
 If everything looks good, respond with **exactly**:
-"Verified Pull Request: No Change Needed"
+\"Verified Pull Request: No Change Needed\"
 
 Pull Request: `${CHANGE_BRANCH}` ? `${CHANGE_TARGET}`
 
 Commit Message:
 ${commitMessage}
 
- Changed Code:
+Changed Code:
 ${changedContent}
 """
 
@@ -71,12 +74,13 @@ ${changedContent}
               prompt: prompt,
               stream: false
             ])
-            // Print the final prompt to Jenkins log
-             echo "Final Prompt Sent to Ollama:\n${prompt}"
+
+            echo "Final Prompt Sent to Ollama:\n${prompt}"
+
             writeFile file: 'ollama_request.json', text: jsonText
 
             sh """
-              curl -s "${OLLAMA_URL}/api/generate" \
+              curl -s \"${OLLAMA_URL}/api/generate\" \
               -H "Content-Type: application/json" \
               -d @ollama_request.json > ai_response.json
             """
@@ -84,12 +88,12 @@ ${changedContent}
             def responseText = readFile('ai_response.json')
             def message = parseResponse(responseText)
 
-            writeFile file: 'gh_comment.md', text: "### AI Code Review\n\n${message}"
+            writeFile file: 'gh_comment.md', text: "### ?? AI Code Review\n\n${message}"
 
             sh '''
-              gh pr comment $CHANGE_ID \
-              --body-file gh_comment.md \
-              --repo Pradeep-O-02/python
+             gh pr comment $CHANGE_ID \
+             --body-file gh_comment.md \
+             --repo Pradeep-O-02/pythoon
             '''
           }
         }

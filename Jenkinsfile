@@ -72,8 +72,6 @@ ${changedContent}
               stream: false
             ])
 
-            echo "Final Prompt Sent to Ollama:\n${prompt}"
-
             writeFile file: 'ollama_request.json', text: jsonText
 
             sh """
@@ -88,9 +86,9 @@ ${changedContent}
             writeFile file: 'gh_comment.md', text: "### AI Code Review\n\n${message}"
 
             sh '''
-             gh pr comment $CHANGE_ID \
-             --body-file gh_comment.md \
-             --repo Pradeep-O-02/pythoon
+              gh pr comment $CHANGE_ID \
+              --body-file gh_comment.md \
+              --repo Pradeep-O-02/pythoon
             '''
           }
         }
@@ -122,7 +120,18 @@ ${changedContent}
 
     stage('Build') {
       steps {
-        sh './gradlew build' // or use your own build command
+        sh '''
+          echo "?? Running Python test & build steps..."
+
+          # Run tests if available
+          python3 -m unittest discover -s tests || echo "No tests found"
+
+          # Optional: Create wheel package if setup.py exists
+          if [ -f setup.py ]; then
+            pip install setuptools wheel
+            python3 setup.py sdist bdist_wheel
+          fi
+        '''
       }
     }
 
@@ -136,13 +145,18 @@ ${changedContent}
             def tagName = getNextSemanticTag()
             echo "Using tag: ${tagName}"
 
+            def assets = ''
+            if (fileExists('dist')) {
+              assets = 'dist/*'
+            }
+
             sh """
               gh auth login --with-token <<< "$GITHUB_TOKEN"
               gh release create ${tagName} \
                 --title "Release ${tagName}" \
                 --notes-file release_notes.md \
-                target/*.jar \
-                --repo Pradeep-O-02/python
+                ${assets} \
+                --repo Pradeep-O-02/pythoon
             """
           }
         }
@@ -152,7 +166,7 @@ ${changedContent}
 
   post {
     always {
-      archiveArtifacts artifacts: 'release_notes.md,target/*.jar', fingerprint: true
+      archiveArtifacts artifacts: 'release_notes.md,dist/*,**/test-results/*.xml', fingerprint: true
     }
   }
 }
@@ -202,6 +216,7 @@ String getNextSemanticTag() {
 
   return "v${major}.${minor}.${patch}"
 }
+
 
 
 

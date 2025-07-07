@@ -194,8 +194,12 @@ String detectLanguage(String ext) {
 @NonCPS
 String getNextSemanticTag() {
   def latestTag = sh(script: "git describe --tags --abbrev=0 || echo v0.0.0", returnStdout: true).trim()
-  def (major, minor, patch) = latestTag.replace('v', '').tokenize('.').collect { it.toInteger() }
-  patch += 1
+  def tagParts = latestTag.replace('v', '').tokenize('.')
+
+  def major = tagParts[0].toInteger()
+  def minor = tagParts[1].toInteger()
+  def patch = tagParts[2].toInteger() + 1
+
   return "v${major}.${minor}.${patch}"
 }
 

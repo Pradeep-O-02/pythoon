@@ -4,7 +4,7 @@ pipeline {
   environment {
     OLLAMA_URL = 'http://localhost:11434'
     GITHUB_REPO = 'Pradeep-O-02/python'
-    CHANGE_TARGET = env.CHANGE_TARGET ?: 'master'
+    CHANGE_TARGET = 'master'
   }
 
   stages {
@@ -31,56 +31,43 @@ pipeline {
             echo "Merge base: ${base}"
             echo "Changed files: ${diffFiles.join(', ')}"
 
-            def changedContent = diffFiles.collect { file ->
+            def reviews = diffFiles.collect { file ->
               def ext = file.tokenize('.').last().toLowerCase()
               def language = detectLanguage(ext)
               def fileDiff = sh(script: "git diff --unified=3 --function-context ${base} HEAD -- ${file}", returnStdout: true).trim()
-              return "**File: ${file}** _(Language: ${language})_\n```diff\n${fileDiff}\n```"
-            }.join("\n\n")
 
-            def prompt = """You are an expert code reviewer.
+              def prompt = """
+You are an expert code reviewer.
 
-Your task is to review the following pull request diff for:
+Review the changes in **${file}** (Language: ${language}).
+Summarize issues, suggestions, or improvements in 1-2 lines.
+If no issues, respond: "No major issues in ${file}".
 
-- Logic errors
-- Linting or syntax issues
-- Bad practices
-- Commit message formatting
-
-Commit Message Format:
-[TICKET_ID]: Ticket-Title
-{CHANGE_DESCRIPTION}
-
-If everything looks good, respond with **exactly**:
-\"Verified Pull Request: No Change Needed\"
-
-Pull Request: `${CHANGE_BRANCH}` ? `${CHANGE_TARGET}`
-
-Commit Message:
-${commitMessage}
-
-Changed Code:
-${changedContent}
+\`\`\`diff
+${fileDiff}
+\`\`\`
 """
 
-            def jsonText = groovy.json.JsonOutput.toJson([
-              model : "codellama:13b",
-              prompt: prompt,
-              stream: false
-            ])
+              def jsonText = groovy.json.JsonOutput.toJson([
+                model : "codellama:13b",
+                prompt: prompt,
+                stream: false
+              ])
 
-            writeFile file: 'ollama_request.json', text: jsonText
+              writeFile file: "request_${file}.json", text: jsonText
 
-            sh """
-              curl -s \"${OLLAMA_URL}/api/generate\" \
-              -H \"Content-Type: application/json\" \
-              -d @ollama_request.json > ai_response.json
-            """
+              sh """
+                curl -s "${OLLAMA_URL}/api/generate" \
+                -H "Content-Type: application/json" \
+                -d @request_${file}.json > response_${file}.json
+              """
 
-            def responseText = readFile('ai_response.json')
-            def message = parseResponse(responseText)
+              def response = readFile("response_${file}.json")
+              return "- **${file}**:\n${parseResponse(response).trim()}"
+            }
 
-            writeFile file: 'gh_comment.md', text: "### AI Code Review\n\n${message}"
+            def summary = reviews.join("\n\n")
+            writeFile file: 'gh_comment.md', text: "### ?? AI Code Review Summary\n\n${summary}"
 
             sh """
               gh pr comment ${CHANGE_ID} \
@@ -139,9 +126,9 @@ ${changedContent}
             def assets = fileExists('dist') ? 'dist/*' : ''
 
             sh """
-              gh auth login --with-token <<< \"$GITHUB_TOKEN\"
+              gh auth login --with-token <<< "$GITHUB_TOKEN"
               gh release create ${tagName} \
-                --title \"Release ${tagName}\" \
+                --title "Release ${tagName}" \
                 --notes-file release_notes.md \
                 ${assets} \
                 --repo ${GITHUB_REPO} || echo 'Release might already exist'
@@ -204,6 +191,7 @@ String getNextSemanticTag() {
 
   return "v${major}.${minor}.${patch}"
 }
+
 
 
 

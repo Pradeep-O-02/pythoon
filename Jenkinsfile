@@ -3,8 +3,8 @@ pipeline {
 
   environment {
     OLLAMA_URL = 'http://localhost:11434'
-    GITHUB_REPO = 'Pradeep-O-02/pythoon'
-    CHANGE_TARGET = env.CHANGE_TARGET ?: 'main'
+    GITHUB_REPO = 'Pradeep-O-02/python'
+    CHANGE_TARGET = env.CHANGE_TARGET ?: 'master'
   }
 
   stages {
@@ -128,7 +128,7 @@ ${changedContent}
 
     stage('Publish GitHub Release') {
       when {
-        expression { return env.CHANGE_TARGET == 'main' || env.CHANGE_TARGET == 'release' }
+        expression { return env.CHANGE_TARGET == 'master' || env.CHANGE_TARGET == 'release' }
       }
       steps {
         withCredentials([string(credentialsId: 'github_token_id', variable: 'GITHUB_TOKEN')]) {

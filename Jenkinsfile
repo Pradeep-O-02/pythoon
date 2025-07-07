@@ -3,6 +3,8 @@ pipeline {
 
   environment {
     OLLAMA_URL = 'http://localhost:11434'
+    GITHUB_REPO = 'Pradeep-O-02/pythoon'
+    CHANGE_TARGET = env.CHANGE_TARGET ?: 'main'
   }
 
   stages {
@@ -32,12 +34,7 @@ pipeline {
             def changedContent = diffFiles.collect { file ->
               def ext = file.tokenize('.').last().toLowerCase()
               def language = detectLanguage(ext)
-
-              def fileDiff = sh(
-                script: "git diff --unified=3 --function-context ${base} HEAD -- ${file}",
-                returnStdout: true
-              ).trim()
-
+              def fileDiff = sh(script: "git diff --unified=3 --function-context ${base} HEAD -- ${file}", returnStdout: true).trim()
               return "**File: ${file}** _(Language: ${language})_\n```diff\n${fileDiff}\n```"
             }.join("\n\n")
 
@@ -55,7 +52,7 @@ Commit Message Format:
 {CHANGE_DESCRIPTION}
 
 If everything looks good, respond with **exactly**:
-"Verified Pull Request: No Change Needed"
+\"Verified Pull Request: No Change Needed\"
 
 Pull Request: `${CHANGE_BRANCH}` ? `${CHANGE_TARGET}`
 
@@ -75,8 +72,8 @@ ${changedContent}
             writeFile file: 'ollama_request.json', text: jsonText
 
             sh """
-              curl -s "${OLLAMA_URL}/api/generate" \
-              -H "Content-Type: application/json" \
+              curl -s \"${OLLAMA_URL}/api/generate\" \
+              -H \"Content-Type: application/json\" \
               -d @ollama_request.json > ai_response.json
             """
 
@@ -85,20 +82,17 @@ ${changedContent}
 
             writeFile file: 'gh_comment.md', text: "### AI Code Review\n\n${message}"
 
-            sh '''
-              gh pr comment $CHANGE_ID \
+            sh """
+              gh pr comment ${CHANGE_ID} \
               --body-file gh_comment.md \
-              --repo Pradeep-O-02/pythoon
-            '''
+              --repo ${GITHUB_REPO}
+            """
           }
         }
       }
     }
 
     stage('Generate Release Notes') {
-      when {
-        expression { return env.CHANGE_ID != null }
-      }
       steps {
         script {
           def base = sh(script: "git merge-base origin/${CHANGE_TARGET} HEAD", returnStdout: true).trim()
@@ -122,11 +116,8 @@ ${changedContent}
       steps {
         sh '''
           echo "?? Running Python test & build steps..."
-
-          # Run tests if available
           python3 -m unittest discover -s tests || echo "No tests found"
 
-          # Optional: Create wheel package if setup.py exists
           if [ -f setup.py ]; then
             pip install setuptools wheel
             python3 setup.py sdist bdist_wheel
@@ -145,18 +136,15 @@ ${changedContent}
             def tagName = getNextSemanticTag()
             echo "Using tag: ${tagName}"
 
-            def assets = ''
-            if (fileExists('dist')) {
-              assets = 'dist/*'
-            }
+            def assets = fileExists('dist') ? 'dist/*' : ''
 
             sh """
-              gh auth login --with-token <<< "$GITHUB_TOKEN"
+              gh auth login --with-token <<< \"$GITHUB_TOKEN\"
               gh release create ${tagName} \
-                --title "Release ${tagName}" \
+                --title \"Release ${tagName}\" \
                 --notes-file release_notes.md \
                 ${assets} \
-                --repo Pradeep-O-02/pythoon
+                --repo ${GITHUB_REPO} || echo 'Release might already exist'
             """
           }
         }

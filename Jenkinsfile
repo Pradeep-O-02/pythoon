@@ -3,8 +3,6 @@ pipeline {
 
   environment {
     OLLAMA_URL = 'http://localhost:11434'
-    GITHUB_REPO = 'Pradeep-O-02/python'
-    CHANGE_TARGET = 'master'
   }
 
   stages {
@@ -31,55 +29,79 @@ pipeline {
             echo "Merge base: ${base}"
             echo "Changed files: ${diffFiles.join(', ')}"
 
-            def reviews = diffFiles.collect { file ->
+            def changedContent = diffFiles.collect { file ->
               def ext = file.tokenize('.').last().toLowerCase()
               def language = detectLanguage(ext)
-              def fileDiff = sh(script: "git diff --unified=3 --function-context ${base} HEAD -- ${file}", returnStdout: true).trim()
 
-              def prompt = """
-You are an expert code reviewer.
+              def fileDiff = sh(
+                script: "git diff --unified=3 --function-context ${base} HEAD -- ${file}",
+                returnStdout: true
+              ).trim()
 
-Review the changes in **${file}** (Language: ${language}).
-Summarize issues, suggestions, or improvements in 1-2 lines.
-If no issues, respond: "No major issues in ${file}".
-
-\`\`\`diff
+              return """**File: ${file}** _(Language: ${language})_
+```diff
 ${fileDiff}
-\`\`\`
+```"""
+            }.join("\n\n")
+
+            def prompt = """You are an expert code reviewer.
+
+Your task is to review the following pull request diff for:
+
+- Logic errors
+- Linting or syntax issues
+- Bad practices
+- Commit message formatting
+
+Commit Message Format:
+[TICKET_ID]: Ticket-Title
+{CHANGE_DESCRIPTION}
+
+If everything looks good, respond with **exactly**:
+"Verified Pull Request: No Change Needed"
+
+Pull Request: `${CHANGE_BRANCH}`  `${CHANGE_TARGET}`
+
+Commit Message:
+${commitMessage}
+
+Changed Code:
+${changedContent}
 """
 
-              def jsonText = groovy.json.JsonOutput.toJson([
-                model : "codellama:13b",
-                prompt: prompt,
-                stream: false
-              ])
+            def jsonText = groovy.json.JsonOutput.toJson([
+              model : "codellama:13b",
+              prompt: prompt,
+              stream: false
+            ])
 
-              writeFile file: "request_${file}.json", text: jsonText
-
-              sh """
-                curl -s "${OLLAMA_URL}/api/generate" \
-                -H "Content-Type: application/json" \
-                -d @request_${file}.json > response_${file}.json
-              """
-
-              def response = readFile("response_${file}.json")
-              return "- **${file}**:\n${parseResponse(response).trim()}"
-            }
-
-            def summary = reviews.join("\n\n")
-            writeFile file: 'gh_comment.md', text: "### ?? AI Code Review Summary\n\n${summary}"
+            writeFile file: 'ollama_request.json', text: jsonText
 
             sh """
-              gh pr comment ${CHANGE_ID} \
-              --body-file gh_comment.md \
-              --repo ${GITHUB_REPO}
+              curl -s "${OLLAMA_URL}/api/generate" \
+              -H "Content-Type: application/json" \
+              -d @ollama_request.json > ai_response.json
             """
+
+            def responseText = readFile('ai_response.json')
+            def message = parseResponse(responseText)
+
+            writeFile file: 'gh_comment.md', text: "### AI Code Review\n\n${message}"
+
+            sh '''
+              gh pr comment $CHANGE_ID \
+              --body-file gh_comment.md \
+              --repo Pradeep-O-02/pythoon
+            '''
           }
         }
       }
     }
 
     stage('Generate Release Notes') {
+      when {
+        expression { return env.CHANGE_ID != null }
+      }
       steps {
         script {
           def base = sh(script: "git merge-base origin/${CHANGE_TARGET} HEAD", returnStdout: true).trim()
@@ -103,8 +125,11 @@ ${fileDiff}
       steps {
         sh '''
           echo "?? Running Python test & build steps..."
+
+          # Run tests if available
           python3 -m unittest discover -s tests || echo "No tests found"
 
+          # Optional: Create wheel package if setup.py exists
           if [ -f setup.py ]; then
             pip install setuptools wheel
             python3 setup.py sdist bdist_wheel
@@ -115,7 +140,7 @@ ${fileDiff}
 
     stage('Publish GitHub Release') {
       when {
-        expression { return env.CHANGE_TARGET == 'master' || env.CHANGE_TARGET == 'release' }
+        expression { return env.CHANGE_TARGET == 'main' || env.CHANGE_TARGET == 'release' }
       }
       steps {
         withCredentials([string(credentialsId: 'github_token_id', variable: 'GITHUB_TOKEN')]) {
@@ -123,7 +148,10 @@ ${fileDiff}
             def tagName = getNextSemanticTag()
             echo "Using tag: ${tagName}"
 
-            def assets = fileExists('dist') ? 'dist/*' : ''
+            def assets = ''
+            if (fileExists('dist')) {
+              assets = 'dist/*'
+            }
 
             sh """
               gh auth login --with-token <<< "$GITHUB_TOKEN"
@@ -131,7 +159,7 @@ ${fileDiff}
                 --title "Release ${tagName}" \
                 --notes-file release_notes.md \
                 ${assets} \
-                --repo ${GITHUB_REPO} || echo 'Release might already exist'
+                --repo Pradeep-O-02/pythoon
             """
           }
         }
@@ -191,6 +219,7 @@ String getNextSemanticTag() {
 
   return "v${major}.${minor}.${patch}"
 }
+
 
 
 
